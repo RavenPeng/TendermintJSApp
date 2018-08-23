@@ -1,8 +1,8 @@
 {
-  "name": "js-abci-example",
+  "name": "tendermint-js-app",
   "version": "0.0.1",
-  "description": "Javascript ABCI example application",
-  "main": "app.js",
+  "description": "A Tendermint validator written in Javascript",
+  "main": "validator.js",
   "dependencies": {
     "js-abci": "0.1.1"
   }
