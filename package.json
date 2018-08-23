@@ -4,6 +4,7 @@
   "description": "A Tendermint validator written in Javascript",
   "main": "validator.js",
   "dependencies": {
-    "js-abci": "0.1.1"
+    "abci": "3.0.2",
+    "atob": "2.1.2"
   }
 }

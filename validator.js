@@ -1,80 +1,54 @@
-var abci = require("js-abci");
-var util = require("util");
+let createABCIServer = require('abci')
 
-function CounterApp(){
-	this.hashCount = 0;
-	this.txCount = 0;
-  this.serial = false;
-};
+// turn on debug logging
+require('debug').enable('abci*')
 
-CounterApp.prototype.info = function(req, cb) {
-  return cb({
-    data: util.format("hashes:%d, txs:%d", this.hashCount, this.txCount),
-  });
+let state = {
+  count: 0
 }
 
-CounterApp.prototype.setOption = function(req, cb) {
-	if (req.key == "serial") {
-    if (req.value == "on") {
-      this.serial = true;
-      return cb({log:"ok"});
-    } else {
-      return cb({log:"Unexpected value "+req.value});
+let handlers = {
+  info (request) {
+    return {
+      data: 'Node.js counter app',
+      version: '0.0.0',
+      lastBlockHeight: 0,
+      lastBlockAppHash: Buffer.alloc(0)
     }
-	}
-  return cb({log: "Unexpected key "+req.key});
+  },
+
+  checkTx (request) {
+    let tx = padTx(request.tx)
+    let number = tx.readUInt32BE(0)
+		console.log("Transaction is " + tx)
+    if (number !== state.count) {
+      return { code: 1, log: 'tx does not match count' }
+    }
+    return { code: 0, log: 'tx succeeded' }
+  },
+
+  deliverTx (request) {
+    let tx = padTx(request.tx)
+    let number = tx.readUInt32BE(0)
+    if (number !== state.count) {
+      return { code: 1, log: 'tx does not match count' }
+    }
+
+    // update state
+    state.count += 1
+
+    return { code: 0, log: 'tx succeeded' }
+  }
 }
 
-CounterApp.prototype.deliverTx = function(req, cb) {
-  var txBytes = req.tx.toBuffer();
-	if (this.serial) {
-		if (txBytes.length >= 2 && txBytes.slice(0, 2) == "0x") {
-      var hexString = txBytes.toString("ascii", 2);
-      var hexBytes = new Buffer(hexString, "hex");
-      txBytes = hexBytes;
-		}	
-    var txValue = txBytes.readUIntBE(0, txBytes.length);
-		if (txValue != this.txCount){
-      return cb({code:abci.CodeType.BadNonce, log:"Nonce is invalid. Got "+txValue+", expected "+this.txCount});
-		}
-	}
-	this.txCount += 1;
-	return cb({code:abci.CodeType_OK});
+// make sure the transaction data is 4 bytes long
+function padTx (tx) {
+  let buf = Buffer.alloc(4)
+  tx.copy(buf, 4 - tx.length)
+  return buf
 }
 
-CounterApp.prototype.checkTx = function(req, cb) {
-  var txBytes = req.tx.toBuffer();
-	if (this.serial) {
-		if (txBytes.length >= 2 && txBytes.slice(0, 2) == "0x") {
-      var hexString = txBytes.toString("ascii", 2);
-      var hexBytes = new Buffer(hexString, "hex");
-      txBytes = hexBytes;
-		}	
-    var txValue = txBytes.readUIntBE(0, txBytes.length);
-		if (txValue < this.txCount){
-      return cb({code:abci.CodeType.BadNonce, log:"Nonce is too low. Got "+txValue+", expected >= "+this.txCount});
-		}
-	}
-	return cb({code:abci.CodeType_OK});
-}
-
-CounterApp.prototype.commit = function(req, cb) {
-	this.hashCount += 1;
-	if (this.txCount == 0){
-    return cb({log:"Zero tx count; hash is empth"});
-	}
-  var buf = new Buffer(8);
-  buf.writeIntBE(this.txCount, 0, 8);
-  return cb({data:buf});
-}
-
-CounterApp.prototype.query = function(req, cb) {
-  return cb({code:abci.CodeType_OK, log:"Query not yet supported"});
-}
-
-console.log("Counter app in Javascript");
-
-var app = new CounterApp();
-var appServer = new abci.Server(app);
-//appServer.server.listen(46658);
-appServer.server.listen(26659);
+let port = 26658
+createABCIServer(handlers).listen(port, () => {
+  console.log(`listening on port ${port}`)
+})
