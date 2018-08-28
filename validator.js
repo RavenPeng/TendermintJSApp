@@ -1,4 +1,5 @@
 let createABCIServer = require('abci')
+let crypto = require('crypto')
 
 // turn on debug logging
 require('debug').enable('abci*')
