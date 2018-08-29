@@ -2,6 +2,7 @@ var readline = require('readline');
 const Buffer = require('buffer').Buffer;
 var fs = require('fs');
 const os = require('os');
+var decode = require('./txDecoder');
 
 var rl = readline.createInterface({
   input: process.stdin,
@@ -42,10 +43,9 @@ function getDataUser() {
     getDataUserInputTx().then(function() {
       rl.question("Please provide number of outputs: ", function(numOutputsUsr) {
 
-        var numOutput = numOutputsUsr;
+        numOutputs = numOutputsUsr;
 
-
-        for (let i = 0; i < numInputs; i++) {
+        for (let i = 0; i < numOutputs; i++) {
           rl.question("Please provide output address " + (i + 1).toString() + ": ", function(outAddress) {
             outHash[i] = outAddress;
 
@@ -90,8 +90,12 @@ function addInputs(buffer, offset) {
     for (let i = 0; i < numInputs; i++) {
       getKeyFromFile(inputPubKeyNum[i], "pub")
       .then(function (pubKey)  {
+        buffer.writeUInt16BE(inputHash[i].length, offset.value);
+        offset.value += 2;
         buffer.write(inputHash[i], offset.value);
         offset.value += inputHash[i].length;
+        buffer.writeUInt16BE(pubKey.length, offset.value);
+        offset.value += 2;
         buffer.write(pubKey, offset.value);
         offset.value += pubKey.length;
 
@@ -107,36 +111,52 @@ function addInputs(buffer, offset) {
 function addOutputs(buffer, offset) {
   buffer.writeUInt8(numOutputs, offset.value);
   offset.value += 1;
+  console.log("wrote num output as " + numOutputs)
 
-  for (let i = 0; i <= numOutputs; i++) {
+  for (let i = 0; i < numOutputs; i++) {
+      buffer.writeUInt16BE(outHash[i].length, offset.value);
+      offset.value += 2;
       buffer.write(outHash[i], offset.value);
       offset.value += outHash[i].length;
-      buffer.write(outValue[i], offset.value);
-      offset.value += outValue[i].length;
+      buffer.writeUInt32BE(outValue[i], offset.value);
+      offset.value += 4;
   }
 }
 
 function buildString() {
-  // Pre-reserver a huge buffer. TODO shrink it if possible
-  var buffer = Buffer.alloc(10000);
-  var offset = { value: 0 };
+    var promise = new Promise(function(resolve, reject) {
+    // Pre-reserver a huge buffer. TODO shrink it if possible
+    var buffer = Buffer.alloc(10000);
+    var offset = { value: 0 };
 
-  addInputs(buffer, offset)
-  .then(function() {
-      addOutputs(buffer, offset);
-  })
-  .then(function() {
-      console.log(buffer);
-  })
+    addInputs(buffer, offset)
+    .then(function() {
+        addOutputs(buffer, offset);
+    })
+    .then(function() {
+        resolve({buffer: buffer, offset: offset});
+    })
+  });
+  return promise;
 }
 
 getDataUser()
 .then(function () {
-  console.log("User data is collected, building string");
-  buildString();
+  var promise = new Promise(function(resolve, reject) {
+    buildString()
+    .then(function(result) {
+      resolve(result)
+    })
+  })
+  return promise;
+})
+.then(function (result) {
+  fs.writeFile("preparedMsg2.txt", result.buffer.toString('hex', 0, result.offset.value), function(err) {
+    console.log("File is written")
+  });
+  //decode.decodeTx(result.buffer);
+})
 
-  setTimeout(function(str1, str2) {
+  /*setTimeout(function(str1, str2) {
     console.log("timeout");
-  }, 1000);
-}
-)
+  }, 1000);*/
