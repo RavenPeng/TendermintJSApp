@@ -34,6 +34,17 @@ async function insertTx(tx) {
   closeConnection(result.client);
 }
 
+async function getValue(userAddress) {
+  let resultDB = await getDB();
+  const collection = resultDB.db.collection('valuerecords');
+  // Find some documents
+  let resultFind = await collection.findOne({address: userAddress},
+    {projection : { "_id": 0, "value": 1}});
+  closeConnection(resultDB.client);
+  return resultFind;
+}
+
 module.exports = {
-  insertTx: insertTx
+  insertTx: insertTx,
+  getValue: getValue
 };
