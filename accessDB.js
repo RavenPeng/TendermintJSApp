@@ -25,12 +25,12 @@ function closeConnection(client) {
   }
 }
 
-async function insertTx(tx) {
+async function insertNew(newAddress, newValue) {
   let result = await getDB();
   // Get the documents collection
   const collection = result.db.collection('valuerecords');
   // Insert some documents
-  await collection.insert(tx);
+  await collection.insert({address: newAddress, value : newValue});
   closeConnection(result.client);
 }
 
@@ -44,7 +44,18 @@ async function getValue(userAddress) {
   return resultFind;
 }
 
+async function updateValue(userAddress, newValue) {
+  let resultDB = await getDB();
+  const collection = resultDB.db.collection('valuerecords');
+
+  await collection.updateOne({address: userAddress},  { $set: {value: newValue} } )
+  console.log("Updated " + userAddress + " to value " + newValue)
+  closeConnection(resultDB.client);
+  console.log("end of update value")
+}
+
 module.exports = {
-  insertTx: insertTx,
-  getValue: getValue
+  insertNew: insertNew,
+  getValue: getValue,
+  updateValue: updateValue
 };
