@@ -64,18 +64,13 @@ async function getKeyFromFile(num, type) {
   console.log("Openning file: " + os.homedir() + "/.dcoin/rsa" + type + "key" + num + ".pem");
   let concatenatedKey = "";
 
-  fs.readFile(os.homedir() + "/.dcoin/rsa" + type + "key" + num + ".pem",  'utf8', function(err, data) {
-    if(err) {
-      throw err;
-    }
-    let splitArray = data.split('\n');
+  let data = fs.readFileSync(os.homedir() + "/.dcoin/rsa" + type + "key" + num + ".pem",  'utf8')
+  let splitArray = data.split('\n');
 
-    // Skip the first and last sentence as they do not contain data
-    for(let i=1; i < splitArray.length -2; ++i) {
-      concatenatedKey += splitArray[i];
-    }
-
-  });
+  // Skip the first and last sentence as they do not contain data
+  for(let i=1; i < splitArray.length -2; ++i) {
+    concatenatedKey += splitArray[i];
+  }
 
   return concatenatedKey;
 }
@@ -87,14 +82,15 @@ async function addInputs(buffer, offset) {
   for (let i = 0; i < numInputs; i++) {
     let pubKey = await getKeyFromFile(inputPubKeyNum[i], "pub")
 
-    const txHash = crypto.createHash('sha256').update(pubKey).digest('hex');
-    buffer.writeUInt16BE(txHash.length, offset.value);
+    const txHashBuffer = crypto.createHash('sha256').update(pubKey).digest();
+
+    buffer.writeUInt16BE(txHashBuffer.length, offset.value);
     offset.value += 2;
-    buffer.write(txHash, offset.value);
-    console.log("txHash saved as" + txHash.length)
-    offset.value += txHash.length;
+    txHashBuffer.copy(buffer, offset.value, 0, txHashBuffer.length);
+    offset.value += txHashBuffer.length;
     buffer.writeUInt16BE(pubKey.length, offset.value);
     console.log("pubkey length written as " + pubKey.length)
+    console.log("pubkey written as " + pubKey)
     offset.value += 2;
     buffer.write(pubKey, offset.value);
     offset.value += pubKey.length;

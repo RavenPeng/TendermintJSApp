@@ -9,7 +9,7 @@ function getInputs(buffer, offset) {
     for (let i = 0; i < inputResult.numInputs; i++) {
         let inputHashLength = buffer.readUInt16BE(offset.value);
         offset.value += 2;
-        inputResult.inputHash[i] = buffer.toString('utf8', offset.value, offset.value + inputHashLength);
+        inputResult.inputHash[i] = buffer.toString('hex', offset.value, offset.value + inputHashLength);
         offset.value += inputHashLength;
         console.log("Inputs length decoded as: " + inputHashLength);
         let inputPubKeyLength = buffer.readUInt16BE(offset.value);

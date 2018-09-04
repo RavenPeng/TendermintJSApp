@@ -3,7 +3,7 @@ const assert = require('assert');
 
 async function getDB() {
   // Connection URL
-  const url = 'mongodb://localhost:27017';
+  const url = 'mongodb://127.0.0.1:27017';
   // Database Name
   const dbName = 'dcoin';
 
@@ -15,7 +15,7 @@ async function getDB() {
 
     return {client : client, db : db};
   } catch (err) {
-    console.log(err.stack);
+    console.error(err.stack);
   }
 }
 

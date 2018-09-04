@@ -10,7 +10,7 @@ let state = {
   count: 0
 }
 
-function checkInputs(inputs) {
+async function checkInputs(inputs) {
   uthMap = {};
   let valuesSum = 0;
 
@@ -19,17 +19,19 @@ function checkInputs(inputs) {
 
     const hash = crypto.createHash('sha256').update(inputs.inputPubKey[i]).digest('hex');
 
-    if (!(hash.toUpperCase() === inputs.inputHash[i])) {
+    if (!(hash.toUpperCase() === inputs.inputHash[i].toUpperCase())) {
+      console.error("Hashed pub key is: " + hash)
+      console.error("Received UTH is: " + inputs.inputHash[i])
+      console.error("Received pub key is: " + inputs.inputPubKey[i])
       return false;
     }
 
-    dbStorage.getValue(inputs.inputHash[i]).then(
-      (value) => {
-        valuesSum += value.value
-      },
-      (reason) => {
-        console.error("Problem accessing DB: " + reason)// rejection
-      })
+    try {
+      let value = await dbStorage.getValue(inputs.inputHash[i]);
+      valuesSum += value.value;
+    } catch (err) {
+      console.error(err)
+    }
   }
 
   return valuesSum;
@@ -39,7 +41,7 @@ function getSumOutputs(outputResult) {
   let valuesSum = 0;
 
   for (let i = 0; i < outputResult.numOutputs; i++) {
-    valueSum += outputResult.outValue[i];
+    valuesSum += outputResult.outValue[i];
   }
 
   return valuesSum;
@@ -56,6 +58,7 @@ let handlers = {
   },
 
   checkTx (request) {
+    var promise = new Promise(function(resolve, reject) {
     //let tx = padTx(request.tx)
     //let number = tx.readUInt32BE(0)
 		//console.log("Transaction is " + request.tx)
@@ -70,17 +73,25 @@ let handlers = {
     inputResult = decodeResult.inputResult;
     outputResult = decodeResult.outputResult;
 
-    let sumInputs = checkInputs(inputResult);
-    if(!sumInputs) {
-        return { code: -1, log: 'public key hash does not match address' }
-    }
+    checkInputs(inputResult)
+    .then((sumInputs) => {
+        if(!sumInputs) {
+            resolve( { code: -1, log: 'public key hash does not match address' })
+        }
+        return sumInputs
+    })
+    .then((sumInputs) => {
+      let sumOutputs = getSumOutputs(outputResult)
+      console.log("Sum of inputs resolved as: " + sumInputs)
+      console.log("Sum of outputs resolved as: " + sumOutputs)
+      if(sumOutputs >= sumInputs) {
+        return { code: -1, log: 'sum of inputs is not sufficient' }
+      }
 
-    let sumOutputs = getSumOutputs(outputResult)
-    if(sumOutputs >= sumInputs) {
-      return { code: -1, log: 'sum of inputs is not sufficient' }
-    }
-
-    return { code: 0, log: 'tx succeeded' }
+      resolve( { code: 0, log: 'tx succeeded' })
+    })
+  })
+  return promise
   },
 
   deliverTx (request) {
