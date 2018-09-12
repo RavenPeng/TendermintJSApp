@@ -75,6 +75,14 @@ async function getKeyFromFile(num, type) {
   return concatenatedKey;
 }
 
+/*
+* 1) 1 byte - number of Inputs (X)
+*
+* 2) 2 bytes - number of bytes of hash (Y)
+* 3) Y bytes - Hash of input UTO
+*
+* 2 and 3 repeat X times
+*/
 async function addInputs(buffer, offset) {
   buffer.writeUInt8(numInputs, offset.value);
   offset.value += 1;

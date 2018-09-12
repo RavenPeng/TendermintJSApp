@@ -31,6 +31,7 @@ async function insertNew(newAddress, newValue) {
   const collection = result.db.collection('valuerecords');
   // Insert some documents
   await collection.insert({address: newAddress, value : newValue});
+  console.log("Inserted new address " + newAddress + " with balance " + newValue)
   closeConnection(result.client);
 }
 
@@ -48,6 +49,7 @@ async function updateValue(userAddress, newValue) {
   let resultDB = await getDB();
   const collection = resultDB.db.collection('valuerecords');
 
+  console.log("Value on updateValue is: " + typeof newValue);
   await collection.updateOne({address: userAddress},  { $set: {value: newValue} } )
   console.log("Updated " + userAddress + " to value " + newValue)
   closeConnection(resultDB.client);

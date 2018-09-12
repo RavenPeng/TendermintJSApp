@@ -38,6 +38,55 @@ async function checkInputs(inputs) {
   return {result : true, value: valuesSum};
 }
 
+async function checkNewTx(request, shouldCommit) {
+  var promise = new Promise(function(resolve, reject) {
+
+  decodeResult = decode.decodeTx(request.tx);
+
+
+  inputResult = decodeResult.inputResult;
+  outputResult = decodeResult.outputResult;
+
+  checkInputs(inputResult)
+  .then((result) => {
+      if(!result.result) {
+          resolve( { code: -1, log: result.msg })
+      } else {
+          return result.value
+      }
+  })
+  .then( async (sumInputs) => {
+    let sumOutputs = getSumOutputs(outputResult)
+    console.log("Sum of inputs resolved as: " + sumInputs)
+    console.log("Sum of outputs resolved as: " + sumOutputs)
+    if(sumOutputs >= sumInputs) {
+      resolve( { code: -1, log: 'sum of inputs is not sufficient' })
+    } else {
+      if(shouldCommit) {
+        console.log("Transaction fee is " + (sumInputs - sumOutputs))
+        for (let i = 0; i < outputResult.numOutputs; i++) {
+          let currentValue = await dbStorage.getValue(outputResult.outHash[i])
+          console.log("Current value is " + currentValue.value + " type is: " + typeof(currentValue.value))
+          if(currentValue) {
+            await dbStorage.updateValue(outputResult.outHash[i], currentValue.value + outputResult.outValue[i]);
+          } else {
+            await dbStorage.insertNew(outputResult.outHash[i], outputResult.outValue[i]);
+          }
+        }
+        for (let i = 0; i < inputResult.numInputs; i++) {
+            await dbStorage.updateValue(inputResult.inputHash[i], 0);
+        }
+      }
+      resolve( { code: 0, log: 'tx succeeded' })
+    }
+  })
+  .catch( err => {
+    console.error("Catch handled error " + err)
+  } )
+})
+return promise
+}
+
 function getSumOutputs(outputResult) {
   let valuesSum = 0;
 
@@ -57,68 +106,25 @@ let handlers = {
       lastBlockAppHash: Buffer.alloc(0)
     }
   },
-
   checkTx (request) {
-    var promise = new Promise(function(resolve, reject) {
-    //let tx = padTx(request.tx)
-    //let number = tx.readUInt32BE(0)
-		//console.log("Transaction is " + request.tx)
-    //console.log("Type is " + typeof(request.tx))
-    /*if (number !== state.count) {
-      return { code: 1, log: 'tx does not match count' }
-    }*/
-        console.log("Buffer length checkTx is " + request.tx.length)
-    decodeResult = decode.decodeTx(request.tx);
-
-
-    inputResult = decodeResult.inputResult;
-    outputResult = decodeResult.outputResult;
-
-    checkInputs(inputResult)
-    .then((result) => {
-        if(!result.result) {
-            resolve( { code: -1, log: result.msg })
-        } else {
-            return result.value
-        }
-    })
-    .then( async (sumInputs) => {
-      let sumOutputs = getSumOutputs(outputResult)
-      console.log("Sum of inputs resolved as: " + sumInputs)
-      console.log("Sum of outputs resolved as: " + sumOutputs)
-      if(sumOutputs >= sumInputs) {
-        return { code: -1, log: 'sum of inputs is not sufficient' }
-      } else {
-        console.log("Transaction fee is " + (sumInputs - sumOutputs))
-        for (let i = 0; i < outputResult.numOutputs; i++) {
-          let currentValue = await dbStorage.getValue(outputResult.outHash[i])
-          if(currentValue) {
-            await dbStorage.updateValue(outputResult.outHash[i], currentValue + outputResult.outValue[i]);
-          } else {
-            await dbStorage.insertNew(outputResult.outHash[i], outputResult.outValue[i]);
-          }
-        }
-        for (let i = 0; i < inputResult.numInputs; i++) {
-            await dbStorage.updateValue(inputResult.inputHash[i], 0);
-        }
-      }
-      console.log("Before resolve")
-      resolve( { code: 0, log: 'tx succeeded' })
-    })
-  })
-  return promise
+    return checkNewTx(request, false)
   },
-
   deliverTx (request) {
-    let tx = padTx(request.tx)
-    let number = tx.readUInt32BE(0)
-    if (number !== state.count) {
-      return { code: 1, log: 'tx does not match count' }
-    }
-
-    // update state
-    state.count += 1
-
+    console.log("DeliverTx received input:")
+    console.log(JSON.stringify(request))
+    return checkNewTx(request, true)
+  },
+  commit (request) {
+    console.log("Commit received: ")
+    console.log(JSON.stringify(request))
+    let array = new Uint8Array(100);
+    array[42] = 10;
+    return array
+  },
+  beginBlock (request) {
+    console.log("beginBlock received: ")
+    console.log(JSON.stringify(request))
+    console.log("Type of header is: " + typeof(request.header))
     return { code: 0, log: 'tx succeeded' }
   }
 }
